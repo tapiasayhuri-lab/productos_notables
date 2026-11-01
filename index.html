@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TuProfe20 Lab - Productos Notables</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    .glass-panel {
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #4f46e5;
+      border-radius: 4px;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(1deg); }
+    }
+    .animate-float {
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4)); }
+      50% { filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.8)); }
+    }
+    .glow-effect {
+      animation: pulse-glow 3s infinite;
+    }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- SINTETIZADOR DE AUDIO (Web Audio API) ---
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playPop() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+      playSwoosh() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      }
+      playFanfare() {
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          const startTime = this.ctx.currentTime + idx * 0.1;
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(0.2, startTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + 0.4);
+        });
+      }
+    }
+
+    const sfx = new SoundEffects();
+
+    // --- COMPONENTE MATEMÁTICO KATEX ---
+    const MathTex = ({ math, inline = true, className = "" }) => {
+      const containerRef = useRef(null);
+
+      useEffect(() => {
+        if (containerRef.current) {
+          try {
+            katex.render(math, containerRef.current, {
+              displayMode: !inline,
+              throwOnError: false
+            });
+          } catch (e) {
+            console.error("KaTeX error:", e);
+          }
+        }
+      }, [math, inline]);
+
+      return <span ref={containerRef} className={`${className} inline-block px-1`} />;
+    };
+
+    // --- BANCO DE DATOS: 12 RETOS CON SOLUCIÓN PASO A PASO DETALLADA ---
+    const challengesData = [
+      {
+        id: 1,
+        title: "Reto 1: Binomio al Cuadrado (Suma)",
+        originalLabel: "Ejercicio 1.a",
+        statement: "(x + 2)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "x" },
+          { name: "b", value: "2" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identificación de la Fórmula",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Usamos el binomio al cuadrado en su forma de suma. Identificamos el primer término como 'a' y el segundo término como 'b'."
+          },
+          {
+            stepTitle: "2. Sustitución de Variables",
+            katex: "a = x \\quad \\text{y} \\quad b = 2",
+            explanation: "En este caso, reemplazamos 'a' por 'x' y 'b' por '2'."
+          },
+          {
+            stepTitle: "3. Planteamiento de la Estructura",
+            katex: "(x)^2 + 2(x)(2) + (2)^2",
+            explanation: "Escribimos explícitamente el cuadrado del primero, el doble producto del primero por el segundo, y el cuadrado del segundo."
+          },
+          {
+            stepTitle: "4. Multiplicación del Término Central",
+            katex: "x^2 + 4x + (2)^2",
+            explanation: "Multiplicamos los coeficientes numéricos en el término central: 2 · 2 = 4, resultando 4x."
+          },
+          {
+            stepTitle: "5. Elevación del Término Independiente",
+            katex: "x^2 + 4x + 4",
+            explanation: "Calculamos el cuadrado de 2: 2^2 = 4."
+          },
+          {
+            stepTitle: "6. Resultado Final",
+            katex: "(x + 2)^2 = x^2 + 4x + 4",
+            explanation: "¡Listo! El trinomio cuadrado perfecto resultante es x^2 + 4x + 4."
+          }
+        ]
+      },
+      {
+        id: 2,
+        title: "Reto 2: Binomio con Coeficiente (Suma)",
+        originalLabel: "Ejercicio 1.b",
+        statement: "(3x + 6)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "3x" },
+          { name: "b", value: "6" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identificación de Fórmula",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Aplicamos la regla del binomio de suma al cuadrado."
+          },
+          {
+            stepTitle: "2. Asignación de Términos",
+            katex: "a = 3x \\quad \\text{y} \\quad b = 6",
+            explanation: "El primer término 'a' es todo el grupo (3x), por lo que debemos llevarlo entre paréntesis."
+          },
+          {
+            stepTitle: "3. Sustitución en la Fórmula",
+            katex: "(3x)^2 + 2(3x)(6) + (6)^2",
+            explanation: "Sustituimos cuidadosamente incluyendo los coeficientes."
+          },
+          {
+            stepTitle: "4. Elevación del Primer Término",
+            katex: "(3^2 \\cdot x^2) + 2(3x)(6) + (6)^2 = 9x^2 + 2(3x)(6) + (6)^2",
+            explanation: "Elevamos al cuadrado tanto el 3 como la x: (3x)^2 = 9x^2."
+          },
+          {
+            stepTitle: "5. Cálculo del Término Doble Producto",
+            katex: "9x^2 + (2 \\cdot 3 \\cdot 6)x + (6)^2 = 9x^2 + 36x + (6)^2",
+            explanation: "Multiplicamos 2 × 3 × 6 = 36 para obtener el coeficiente central."
+          },
+          {
+            stepTitle: "6. Resultado Simplificado",
+            katex: "9x^2 + 36x + 36",
+            explanation: "Calculamos 6^2 = 36. Obtenemos el trinomio final 9x^2 + 36x + 36."
+          }
+        ]
+      },
+      {
+        id: 3,
+        title: "Reto 3: Binomio al Cuadrado (Diferencia)",
+        originalLabel: "Ejercicio 2.a",
+        statement: "(x - 3)^2",
+        formulaRef: "(a - b)^2 = a^2 - 2ab + b^2",
+        formulaKatex: "(a - b)^2 = a^2 - 2ab + b^2",
+        variables: [
+          { name: "a", value: "x" },
+          { name: "b", value: "3" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identificación del Modelo",
+            katex: "(a - b)^2 = a^2 - 2ab + b^2",
+            explanation: "Al ser una resta, el término central del trinomio será negativo (-2ab)."
+          },
+          {
+            stepTitle: "2. Variables",
+            katex: "a = x \\quad \\text{y} \\quad b = 3",
+            explanation: "Identificamos los valores numéricos y literales."
+          },
+          {
+            stepTitle: "3. Reemplazo Directo",
+            katex: "(x)^2 - 2(x)(3) + (3)^2",
+            explanation: "Reemplazamos con signo menos en el producto central."
+          },
+          {
+            stepTitle: "4. Multiplicación Intermedia",
+            katex: "x^2 - (2 \\cdot 3)x + 9",
+            explanation: "Multiplicamos 2 × 3 = 6 para el término del medio."
+          },
+          {
+            stepTitle: "5. Resultado Final",
+            katex: "x^2 - 6x + 9",
+            explanation: "El trinomio cuadrado perfecto es x^2 - 6x + 9."
+          }
+        ]
+      },
+      {
+        id: 4,
+        title: "Reto 4: Binomio Diferencia con Coeficiente",
+        originalLabel: "Ejercicio 2.b",
+        statement: "(2x - 5)^2",
+        formulaRef: "(a - b)^2 = a^2 - 2ab + b^2",
+        formulaKatex: "(a - b)^2 = a^2 - 2ab + b^2",
+        variables: [
+          { name: "a", value: "2x" },
+          { name: "b", value: "5" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Fórmula de Referencia",
+            katex: "(a - b)^2 = a^2 - 2ab + b^2",
+            explanation: "Trinomio cuadrado perfecto para diferencia de términos."
+          },
+          {
+            stepTitle: "2. Términos",
+            katex: "a = 2x, \\quad b = 5",
+            explanation: "Tomamos '2x' como el primer bloque."
+          },
+          {
+            stepTitle: "3. Planteamiento",
+            katex: "(2x)^2 - 2(2x)(5) + (5)^2",
+            explanation: "Sustituimos el bloque (2x) con paréntesis obligatorios."
+          },
+          {
+            stepTitle: "4. Cuadrado del Primer Término",
+            katex: "4x^2 - 2(2x)(5) + 25",
+            explanation: "Calculamos (2x)^2 = 2^2 · x^2 = 4x^2."
+          },
+          {
+            stepTitle: "5. Producto Central",
+            katex: "4x^2 - (2 \\cdot 2 \\cdot 5)x + 25",
+            explanation: "Multiplicamos 2 × 2 × 5 = 20."
+          },
+          {
+            stepTitle: "6. Solución Completa",
+            katex: "4x^2 - 20x + 25",
+            explanation: "El resultado expresado es 4x^2 - 20x + 25."
+          }
+        ]
+      },
+      {
+        id: 5,
+        title: "Reto 5: Binomio con Fracción I",
+        originalLabel: "Ejercicio 3.a",
+        statement: "\\left(2x + \\frac{1}{2}\\right)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "2x" },
+          { name: "b", value: "\\frac{1}{2}" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Definición de la Regra",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Aplicamos el desarrollo habitual del binomio al cuadrado."
+          },
+          {
+            stepTitle: "2. Sustitución Fraccionaria",
+            katex: "a = 2x \\quad \\text{y} \\quad b = \\frac{1}{2}",
+            explanation: "Reconocemos que el segundo término es una fracción racional."
+          },
+          {
+            stepTitle: "3. Planteamiento Explícito",
+            katex: "(2x)^2 + 2(2x)\\left(\\frac{1}{2}\\right) + \\left(\\frac{1}{2}\\right)^2",
+            explanation: "Reemplazamos en la estructura del trinomio."
+          },
+          {
+            stepTitle: "4. Simplificación del Término Medio",
+            katex: "4x^2 + \\left(2 \\cdot 2x \\cdot \\frac{1}{2}\\right) + \\frac{1}{4}",
+            explanation: "Observa cómo el '2' de la fórmula se simplifica con el denominador '2' del término b."
+          },
+          {
+            stepTitle: "5. Operaciones Intermedias",
+            katex: "4x^2 + 2x + \\frac{1}{4}",
+            explanation: "Queda 2x · 1 = 2x en el centro y (1/2)^2 = 1/4 al final."
+          },
+          {
+            stepTitle: "6. Expresión Final",
+            katex: "4x^2 + 2x + \\frac{1}{4}",
+            explanation: "¡Perfecto! La expresión totalmente simplificada es 4x^2 + 2x + 1/4."
+          }
+        ]
+      },
+      {
+        id: 6,
+        title: "Reto 6: Binomio con Fracción II",
+        originalLabel: "Ejercicio 3.b",
+        statement: "\\left(3x + \\frac{1}{2}\\right)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "3x" },
+          { name: "b", value: "\\frac{1}{2}" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identificación de Modelo",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Cuadrado de la suma de dos términos."
+          },
+          {
+            stepTitle: "2. Términos Específicos",
+            katex: "a = 3x, \\quad b = \\frac{1}{2}",
+            explanation: "Asignamos los componentes."
+          },
+          {
+            stepTitle: "3. Sustitución",
+            katex: "(3x)^2 + 2(3x)\\left(\\frac{1}{2}\\right) + \\left(\\frac{1}{2}\\right)^2",
+            explanation: "Construimos la ecuación con paréntesis."
+          },
+          {
+            stepTitle: "4. Desarrollo de Cuadrados",
+            katex: "9x^2 + 2(3x)\\left(\\frac{1}{2}\\right) + \\frac{1}{4}",
+            explanation: "Calculamos (3x)^2 = 9x^2 y (1/2)^2 = 1/4."
+          },
+          {
+            stepTitle: "5. Cancelación de Factores",
+            katex: "9x^2 + \\left(\\frac{2 \\cdot 3}{2}\\right)x + \\frac{1}{4} = 9x^2 + 3x + \\frac{1}{4}",
+            explanation: "Cancelamos el factor 2 en el numerador y denominador del término medio."
+          },
+          {
+            stepTitle: "6. Resultado Final",
+            katex: "9x^2 + 3x + \\frac{1}{4}",
+            explanation: "El trinomio final simplificado es 9x^2 + 3x + 1/4."
+          }
+        ]
+      },
+      {
+        id: 7,
+        title: "Reto 7: Binomio con Fracción III",
+        originalLabel: "Ejercicio 4.a",
+        statement: "\\left(3x + \\frac{2}{7}\\right)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "3x" },
+          { name: "b", value: "\\frac{2}{7}" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identificación de Fórmula",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Usamos la fórmula estándar del binomio suma."
+          },
+          {
+            stepTitle: "2. Asignación",
+            katex: "a = 3x \\quad \\text{y} \\quad b = \\frac{2}{7}",
+            explanation: "Notar que la fracción tiene numerador 2 y denominador 7."
+          },
+          {
+            stepTitle: "3. Sustitución Directa",
+            katex: "(3x)^2 + 2(3x)\\left(\\frac{2}{7}\\right) + \\left(\\frac{2}{7}\\right)^2",
+            explanation: "Escribimos todos los elementos organizadamente."
+          },
+          {
+            stepTitle: "4. Multiplicación de Numeradores",
+            katex: "9x^2 + \\left(\\frac{2 \\cdot 3 \\cdot 2}{7}\\right)x + \\left(\\frac{2^2}{7^2}\\right)",
+            explanation: "Multiplicamos 2 × 3 × 2 = 12 en el numerador central."
+          },
+          {
+            stepTitle: "5. Cálculo de Cuadrados Fraccionarios",
+            katex: "9x^2 + \\frac{12}{7}x + \\frac{4}{49}",
+            explanation: "Calculamos (2/7)^2 = 4/49."
+          },
+          {
+            stepTitle: "6. Solución",
+            katex: "9x^2 + \\frac{12}{7}x + \\frac{4}{49}",
+            explanation: "Expresión simplificada e irreductible obtenida."
+          }
+        ]
+      },
+      {
+        id: 8,
+        title: "Reto 8: Binomio con Fracción IV",
+        originalLabel: "Ejercicio 4.b",
+        statement: "\\left(3x + \\frac{1}{3}\\right)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "3x" },
+          { name: "b", value: "\\frac{1}{3}" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Modelo Matemático",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Fórmula de desarrollo del trinomio."
+          },
+          {
+            stepTitle: "2. Términos",
+            katex: "a = 3x, \\quad b = \\frac{1}{3}",
+            explanation: "Identificación limpia de variables."
+          },
+          {
+            stepTitle: "3. Planteamiento",
+            katex: "(3x)^2 + 2(3x)\\left(\\frac{1}{3}\\right) + \\left(\\frac{1}{3}\\right)^2",
+            explanation: "Sustitución explícita en cada posición."
+          },
+          {
+            stepTitle: "4. Cancelación Notable",
+            katex: "9x^2 + 2 \\cdot \\left(\\frac{3}{3}\\right)x + \\frac{1}{9}",
+            explanation: "Notamos que 3/3 = 1 en el término del medio."
+          },
+          {
+            stepTitle: "5. Reducción Central",
+            katex: "9x^2 + 2(1)x + \\frac{1}{9} = 9x^2 + 2x + \\frac{1}{9}",
+            explanation: "El término central se reduce de forma limpia a 2x."
+          },
+          {
+            stepTitle: "6. Solución Final",
+            katex: "9x^2 + 2x + \\frac{1}{9}",
+            explanation: "¡Excelente! Trinomio reducido: 9x^2 + 2x + 1/9."
+          }
+        ]
+      },
+      {
+        id: 9,
+        title: "Reto 9: Binomio con Radicales I",
+        originalLabel: "Ejercicio 5.a",
+        statement: "(2\\sqrt{2}x + 2)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "2\\sqrt{2}x" },
+          { name: "b", value: "2" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Regla de Productos Notables",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Aplicamos el binomio al cuadrado en términos con coeficientes irracionales."
+          },
+          {
+            stepTitle: "2. Asignación de Coeficiente Radical",
+            katex: "a = 2\\sqrt{2}x \\quad \\text{y} \\quad b = 2",
+            explanation: "El coeficiente del primer término tiene una raíz cuadrada."
+          },
+          {
+            stepTitle: "3. Planteamiento Estructurado",
+            katex: "(2\\sqrt{2}x)^2 + 2(2\\sqrt{2}x)(2) + (2)^2",
+            explanation: "Sustituimos cuidadosamente entre paréntesis."
+          },
+          {
+            stepTitle: "4. Propiedad de Potencias en Radicales",
+            katex: "(2\\sqrt{2}x)^2 = 2^2 \\cdot (\\sqrt{2})^2 \\cdot x^2 = 4 \\cdot 2 \\cdot x^2 = 8x^2",
+            explanation: "Elevamos al cuadrado cada factor: 2^2 = 4, (√2)^2 = 2, x^2 = x^2 -> 4 × 2 = 8."
+          },
+          {
+            stepTitle: "5. Producto del Término Central",
+            katex: "2 \\cdot (2\\sqrt{2}x) \\cdot 2 = (2 \\cdot 2 \\cdot 2)\\sqrt{2}x = 8\\sqrt{2}x",
+            explanation: "Multiplicamos los coeficientes enteros: 2 × 2 × 2 = 8, conservando la raíz √2."
+          },
+          {
+            stepTitle: "6. Resultado Simplificado",
+            katex: "8x^2 + 8\\sqrt{2}x + 4",
+            explanation: "Sumamos el cuadrado de 2 (que es 4). Trinomio final: 8x^2 + 8√2x + 4."
+          }
+        ]
+      },
+      {
+        id: 10,
+        title: "Reto 10: Binomio con Radicales II",
+        originalLabel: "Ejercicio 5.b",
+        statement: "(3\\sqrt{2}x + 4)^2",
+        formulaRef: "(a + b)^2 = a^2 + 2ab + b^2",
+        formulaKatex: "(a + b)^2 = a^2 + 2ab + b^2",
+        variables: [
+          { name: "a", value: "3\\sqrt{2}x" },
+          { name: "b", value: "4" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Regla Básica",
+            katex: "(a + b)^2 = a^2 + 2ab + b^2",
+            explanation: "Cuadrado del binomio suma."
+          },
+          {
+            stepTitle: "2. Variables",
+            katex: "a = 3\\sqrt{2}x, \\quad b = 4",
+            explanation: "Identificamos término con radical."
+          },
+          {
+            stepTitle: "3. Sustitución",
+            katex: "(3\\sqrt{2}x)^2 + 2(3\\sqrt{2}x)(4) + (4)^2",
+            explanation: "Escribimos la expresión completa."
+          },
+          {
+            stepTitle: "4. Cálculo del Cuadrado Irracional",
+            katex: "(3\\sqrt{2}x)^2 = 3^2 \\cdot (\\sqrt{2})^2 \\cdot x^2 = 9 \\cdot 2 \\cdot x^2 = 18x^2",
+            explanation: "Aplicamos leyes de exponentes: 9 × 2 = 18."
+          },
+          {
+            stepTitle: "5. Multiplicación Central",
+            katex: "2 \\cdot (3\\sqrt{2}x) \\cdot 4 = (2 \\cdot 3 \\cdot 4)\\sqrt{2}x = 24\\sqrt{2}x",
+            explanation: "Multiplicamos números enteros: 2 × 3 × 4 = 24."
+          },
+          {
+            stepTitle: "6. Resultado Final",
+            katex: "18x^2 + 24\\sqrt{2}x + 16",
+            explanation: "Calculamos 4^2 = 16. Obtenemos 18x^2 + 24√2x + 16."
+          }
+        ]
+      },
+      {
+        id: 11,
+        title: "Reto 11: Identidad de Legendre (Suma de Cuadrados)",
+        originalLabel: "Ejercicio 6.a",
+        statement: "(x + 2)^2 + (x - 2)^2",
+        formulaRef: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+        formulaKatex: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+        variables: [
+          { name: "a", value: "x" },
+          { name: "b", value: "2" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identidad de Legendre",
+            katex: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+            explanation: "En lugar de desarrollar ambos binomios por separado, la 1ª Identidad de Legendre nos simplifica directamente el trabajo."
+          },
+          {
+            stepTitle: "2. Identificación de Componentes",
+            katex: "a = x \\quad \\text{y} \\quad b = 2",
+            explanation: "Reconocemos que ambas estructuras comparten los mismos términos a y b."
+          },
+          {
+            stepTitle: "3. Aplicación Directa de Legendre",
+            katex: "2 \\cdot \\left[ (x)^2 + (2)^2 \\right]",
+            explanation: "Reemplazamos en 2(a^2 + b^2)."
+          },
+          {
+            stepTitle: "4. Cálculo Interno",
+            katex: "2 \\cdot (x^2 + 4)",
+            explanation: "Calculamos el cuadrado de 2: 2^2 = 4."
+          },
+          {
+            stepTitle: "5. Distributiva Final",
+            katex: "2x^2 + 8",
+            explanation: "Multiplicamos el 2 por cada término dentro del paréntesis: 2·x^2 + 2·4 = 2x^2 + 8."
+          },
+          {
+            stepTitle: "6. Resultado Simplificado",
+            katex: "(x + 2)^2 + (x - 2)^2 = 2x^2 + 8",
+            explanation: "¡Listo! La respuesta simplificada al máximo es 2x^2 + 8."
+          }
+        ]
+      },
+      {
+        id: 12,
+        title: "Reto 12: Identidad de Legendre con Coeficientes",
+        originalLabel: "Ejercicio 6.b",
+        statement: "(2x + 3)^2 + (2x - 3)^2",
+        formulaRef: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+        formulaKatex: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+        variables: [
+          { name: "a", value: "2x" },
+          { name: "b", value: "3" }
+        ],
+        steps: [
+          {
+            stepTitle: "1. Identidad a Utilizar",
+            katex: "(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)",
+            explanation: "Primera Identidad de Legendre."
+          },
+          {
+            stepTitle: "2. Términos",
+            katex: "a = 2x, \\quad b = 3",
+            explanation: "Notar que 'a' equivale a '2x'."
+          },
+          {
+            stepTitle: "3. Sustitución en la Identidad",
+            katex: "2 \\cdot \\left[ (2x)^2 + (3)^2 \\right]",
+            explanation: "Envolvemos (2x) entre paréntesis."
+          },
+          {
+            stepTitle: "4. Desarrollo de Cuadrados Internos",
+            katex: "2 \\cdot \\left[ 4x^2 + 9 \\right]",
+            explanation: "Calculamos (2x)^2 = 4x^2 y 3^2 = 9."
+          },
+          {
+            stepTitle: "5. Propiedad Distributiva",
+            katex: "2(4x^2) + 2(9)",
+            explanation: "Distribuimos el factor 2."
+          },
+          {
+            stepTitle: "6. Solución Definitiva",
+            katex: "8x^2 + 18",
+            explanation: "Obtenemos 8x^2 + 18."
+          }
+        ]
+      }
+    ];
+
+    // --- COMPONENTE TARJETA DE FÓRMULA INTERACTIVA ---
+    const InteractiveFormulaCard = ({ title, formula, description }) => {
+      const [isOpen, setIsOpen] = useState(false);
+
+      const toggle = () => {
+        sfx.playPop();
+        setIsOpen(!isOpen);
+      };
+
+      return (
+        <div className="glass-panel rounded-xl overflow-hidden transition-all duration-300 border border-indigo-500/30 hover:border-indigo-500/60 shadow-lg">
+          <button
+            onClick={toggle}
+            className="w-full p-4 text-left flex items-center justify-between bg-slate-800/80 hover:bg-slate-700/80 transition-colors"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 font-bold">
+                ƒ
+              </div>
+              <span className="font-bold text-slate-200">{title}</span>
+            </div>
+            <span className="text-indigo-400 font-bold text-sm bg-indigo-950/60 px-3 py-1 rounded-full border border-indigo-500/30">
+              {isOpen ? 'Ocultar' : 'Ver Regla'}
+            </span>
+          </button>
+          
+          {isOpen && (
+            <div className="p-4 bg-slate-900/90 border-t border-slate-700/50 space-y-3 animate-fadeIn">
+              <div className="p-3 bg-slate-950/80 rounded-lg text-center border border-indigo-500/20">
+                <MathTex math={formula} inline={false} className="text-xl text-indigo-300 font-semibold" />
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {description}
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // --- ROBOT ASISTENTE ANIMADO ("TuProfe20") ---
+    const RobotAssistant = ({ currentStepData, totalSteps, currentStepIndex }) => {
+      return (
+        <div className="glass-panel rounded-2xl p-5 shadow-2xl relative overflow-hidden border border-indigo-500/40 flex flex-col md:flex-row items-center gap-5">
+          {/* Fondo decorativo radial */}
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          {/* Avatar del Robot */}
+          <div className="relative flex-shrink-0">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 animate-float glow-effect border border-indigo-300/40">
+              <svg className="w-14 h-14 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="10" rx="2" />
+                <circle cx="12" cy="5" r="2" />
+                <path d="M12 7v4" />
+                <line x1="8" y1="15" x2="8" y2="15.01" strokeWidth="3" strokeLinecap="round" />
+                <line x1="16" y1="15" x2="16" y2="15.01" strokeWidth="3" strokeLinecap="round" />
+                <path d="M9 18c1.5 1 4.5 1 6 0" />
+              </svg>
+            </div>
+            <span className="absolute -bottom-2 right-0 bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-300 shadow">
+              En Vivo
+            </span>
+          </div>
+
+          {/* Bocadillo de Texto del Robot */}
+          <div className="flex-1 space-y-2 text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start space-x-2">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-950/80 px-2.5 py-1 rounded-md border border-indigo-500/30">
+                TuProfe20 Bot
+              </span>
+              <span className="text-xs text-slate-400">
+                Paso {currentStepIndex + 1} de {totalSteps}
+              </span>
+            </div>
+            <h4 className="text-base font-bold text-slate-100">
+              {currentStepData ? currentStepData.stepTitle : "¡Selecciona un paso para comenzar!"}
+            </h4>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {currentStepData ? currentStepData.explanation : "Te guiaré paso a paso explicándote la lógica matemática involucrada."}
+            </p>
+          </div>
+        </div>
+      );
+    };
+
+    // --- COMPONENTE PRINCIPAL (APP) ---
+    function App() {
+      const [activeChallengeIndex, setActiveChallengeIndex] = useState(0);
+      const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
+      const challenge = challengesData[activeChallengeIndex];
+
+      // Cambiar de reto
+      const handleSelectChallenge = (index) => {
+        sfx.playSwoosh();
+        setActiveChallengeIndex(index);
+        setCurrentStepIndex(0);
+      };
+
+      // Control de pasos
+      const nextStep = () => {
+        if (currentStepIndex < challenge.steps.length - 1) {
+          sfx.playPop();
+          setCurrentStepIndex(prev => prev + 1);
+        } else {
+          // Si llega al final del reto
+          sfx.playFanfare();
+          if (typeof confetti === 'function') {
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          }
+        }
+      };
+
+      const prevStep = () => {
+        if (currentStepIndex > 0) {
+          sfx.playPop();
+          setCurrentStepIndex(prev => prev - 1);
+        }
+      };
+
+      return (
+        <div className="min-h-screen pb-16 flex flex-col">
+          {/* HEADER PRINCIPAL */}
+          <header className="glass-panel border-b border-indigo-500/20 sticky top-0 z-50 px-4 py-3">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-indigo-500/40">
+                  20
+                </div>
+                <div>
+                  <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                    TuProfe20 Lab <span className="text-indigo-400 font-normal text-sm sm:text-base">| Productos Notables</span>
+                  </h1>
+                  <p className="text-xs text-slate-400">Resolución guiada paso a paso con álgebra interactiva</p>
+                </div>
+              </div>
+
+              {/* Indicador de Progreso General */}
+              <div className="flex items-center space-x-2 bg-slate-900/80 px-4 py-1.5 rounded-full border border-indigo-500/30">
+                <span className="text-xs font-semibold text-slate-300">Progreso:</span>
+                <span className="text-xs font-bold text-indigo-400">{activeChallengeIndex + 1} / {challengesData.length} Retos</span>
+              </div>
+            </div>
+          </header>
+
+          {/* CONTENIDO PRINCIPAL EN GRID */}
+          <main className="max-w-7xl mx-auto w-full px-4 pt-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* PANEL IZQUIERDO: SELECCIÓN DE RETOS (4 COLS) */}
+            <aside className="lg:col-span-4 space-y-4">
+              <div className="glass-panel rounded-2xl p-4 border border-indigo-500/20">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-indigo-400 mb-3 flex items-center justify-between">
+                  <span>Lista de Retos</span>
+                  <span className="text-xs bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">12 Ejercicios</span>
+                </h3>
+
+                <div className="grid grid-cols-1 gap-2 max-h-[460px] overflow-y-auto custom-scrollbar pr-1">
+                  {challengesData.map((item, idx) => {
+                    const isActive = idx === activeChallengeIndex;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleSelectChallenge(idx)}
+                        className={`w-full p-3 rounded-xl text-left transition-all flex items-center justify-between border ${
+                          isActive
+                            ? 'bg-gradient-to-r from-indigo-600/90 to-violet-600/90 border-indigo-400 text-white shadow-lg shadow-indigo-600/30 translate-x-1'
+                            : 'bg-slate-900/60 hover:bg-slate-800/80 border-slate-700/50 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 overflow-hidden">
+                          <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                            isActive ? 'bg-white text-indigo-900' : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div className="truncate">
+                            <span className="text-[11px] block text-indigo-200 font-semibold">{item.originalLabel}</span>
+                            <div className="truncate text-sm font-bold">
+                              <MathTex math={item.statement} />
+                            </div>
+                          </div>
+                        </div>
+                        {isActive && (
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1"></div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* TARJETAS DE FÓRMULAS E IDENTIDADES */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
+                  Fórmulas de Apoyo
+                </h4>
+                <InteractiveFormulaCard
+                  title="Binomio al Cuadrado (Suma)"
+                  formula="(a + b)^2 = a^2 + 2ab + b^2"
+                  description="El cuadrado del primer término, más el doble producto del primero por el segundo, más el cuadrado del segundo término."
+                />
+                <InteractiveFormulaCard
+                  title="Binomio al Cuadrado (Resta)"
+                  formula="(a - b)^2 = a^2 - 2ab + b^2"
+                  description="El cuadrado del primer término, menos el doble producto del primero por el segundo, más el cuadrado del segundo término."
+                />
+                <InteractiveFormulaCard
+                  title="1ª Identidad de Legendre"
+                  formula="(a + b)^2 + (a - b)^2 = 2(a^2 + b^2)"
+                  description="Simplifica la suma de los cuadrados de un binomio suma y un binomio diferencia con los mismos términos."
+                />
+              </div>
+            </aside>
+
+            {/* PANEL DERECHO: DESARROLLO DEL RETO SELECCIONADO (8 COLS) */}
+            <section className="lg:col-span-8 space-y-6 flex flex-col">
+              
+              {/* ENCABEZADO DEL RETO ACTUAL */}
+              <div className="glass-panel rounded-2xl p-6 border border-indigo-500/30 relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/60 pb-4 mb-4">
+                  <div>
+                    <span className="text-xs font-extrabold text-indigo-400 uppercase tracking-widest bg-indigo-950/80 px-3 py-1 rounded-md border border-indigo-500/30">
+                      {challenge.originalLabel}
+                    </span>
+                    <h2 className="text-2xl font-black text-white mt-2">
+                      {challenge.title}
+                    </h2>
+                  </div>
+                  <div className="bg-slate-950/90 px-4 py-3 rounded-xl border border-indigo-500/30 text-center flex-shrink-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Enunciado</span>
+                    <MathTex math={challenge.statement} inline={false} className="text-2xl font-bold text-indigo-300" />
+                  </div>
+                </div>
+
+                {/* FORMULA DE REFERENCIA Y VARIABLES */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-400 block">Fórmula a usar:</span>
+                    <MathTex math={challenge.formulaKatex} className="text-indigo-300 font-bold text-sm" />
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-[11px] font-semibold text-slate-400">Variables:</span>
+                    <div className="flex gap-2">
+                      {challenge.variables.map((v, i) => (
+                        <span key={i} className="bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700 text-xs text-slate-200">
+                          <MathTex math={`${v.name} = ${v.value}`} />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ROBOT ASISTENTE */}
+              <RobotAssistant
+                currentStepData={challenge.steps[currentStepIndex]}
+                totalSteps={challenge.steps.length}
+                currentStepIndex={currentStepIndex}
+              />
+
+              {/* DESARROLLO GRANULAR PASO A PASO ACUMULATIVO */}
+              <div className="glass-panel rounded-2xl p-6 border border-indigo-500/30 flex-1 flex flex-col justify-between space-y-6">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-300 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Pasos de la Resolución Continua</span>
+                  </h3>
+
+                  <div className="space-y-3">
+                    {challenge.steps.map((s, idx) => {
+                      const isVisible = idx <= currentStepIndex;
+                      const isCurrent = idx === currentStepIndex;
+
+                      if (!isVisible) return null;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-xl border transition-all duration-300 ${
+                            isCurrent
+                              ? 'bg-indigo-950/70 border-indigo-400/80 shadow-lg shadow-indigo-950/50 scale-[1.01]'
+                              : 'bg-slate-900/40 border-slate-800 opacity-75'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center space-x-3">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+                                isCurrent ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="font-bold text-sm text-slate-200">
+                                {s.stepTitle}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pl-9 overflow-x-auto">
+                            <div className="p-3 bg-slate-950/80 rounded-lg border border-slate-800/80 inline-block min-w-full sm:min-w-0">
+                              <MathTex math={s.katex} inline={false} className="text-lg font-semibold text-emerald-300" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* BOTONES DE NAVEGACIÓN ENTRE PASOS */}
+                <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+                  <button
+                    onClick={prevStep}
+                    disabled={currentStepIndex === 0}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 transition-all ${
+                      currentStepIndex === 0
+                        ? 'opacity-40 cursor-not-allowed bg-slate-800 text-slate-500'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600'
+                    }`}
+                  >
+                    <span>← Paso Anterior</span>
+                  </button>
+
+                  <div className="text-xs text-slate-400 font-semibold hidden sm:block">
+                    Paso {currentStepIndex + 1} / {challenge.steps.length}
+                  </div>
+
+                  <button
+                    onClick={nextStep}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 shadow-lg transition-all ${
+                      currentStepIndex === challenge.steps.length - 1
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50'
+                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/50'
+                    }`}
+                  >
+                    <span>
+                      {currentStepIndex === challenge.steps.length - 1
+                        ? '¡Reto Completado! 🎉'
+                        : 'Siguiente Paso →'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    // RENDER REACT APP
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
